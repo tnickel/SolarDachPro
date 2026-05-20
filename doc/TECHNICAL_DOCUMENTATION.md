@@ -213,8 +213,8 @@ Die Koordinaten beziehen sich auf das WGS-84 Koordinatensystem (GPS-Standard).
 |-------|------------|-------------|
 | `/` | Dashboard | KPI-Karten, Status-Verteilung, Kundenübersicht |
 | `/clients` | Clients | Kundentabelle mit Suche |
-| `/projects` | Projects | Projekttabelle mit Status-Filter und Inline-Edit |
-| `/land-registry` | LandRegistry | Grundbuchtabelle mit Modal-Editor |
+| `/projects` | Projects | Projekttabelle mit Status-Filter, Modal zum Anlegen/Bearbeiten und Inline-Edit |
+| `/land-registry` | LandRegistry | Grundbuchtabelle mit Modal-Editor für Rechtsstatus |
 | `/map` | MapView | Leaflet-Karte mit farbcodierten Markern |
 
 ### 5.3 Design-System
@@ -224,8 +224,15 @@ Das Frontend verwendet ein Dark-Mode Design-System mit CSS Custom Properties:
 - **Farbschema**: Dunkles Theme mit Amber/Orange-Akzenten (Solar-Thematik)
 - **Typografie**: Inter (Google Fonts)
 - **Komponenten**: KPI-Cards mit Glow-Effekt, Status-Badges, glassmorphe Panels
-- **Animationen**: Fade-In, Slide-Up, Hover-Transitions
+- **Animationen**: Fade-In, Slide-Up, Hover-Transitions, Toast-Slide-Ins
 - **Responsive**: Grid-basiertes Layout, mobile Anpassungen
+
+### 5.4 State Management & Contexts
+
+Das Frontend nutzt React Context für globales State Management:
+
+- **`AuthContext`**: Verwaltet den JWT-Token, den Login-Status und die Rolle des eingeloggten Benutzers (`ADMIN` oder `VIEWER`). Schützt Routen via `<ProtectedRoute>`.
+- **`ToastContext`**: Stellt eine globale `addToast(message, type)` Funktion bereit, um über das gesamte System hinweg elegantes, non-blocking Feedback (Erfolg, Fehler, Info) per Overlay-Popups anzuzeigen. Dies ersetzt native Browser-Alerts komplett.
 
 ---
 
@@ -295,13 +302,20 @@ Die Demo-Daten bilden ein realistisches Szenario ab:
 
 ## 9. Weiterentwicklung (Roadmap)
 
-### Phase 3 – Erweiterte Features
+### Abgeschlossene Phasen
+- **Phase 1 (MVP)**: API-Backend, Datenbank, Basis-Frontend, Leaflet-Karten.
+- **Phase 2 (Auth)**: JWT-Implementierung, RBAC-Rollen (`ADMIN` / `VIEWER`), Protected Routes.
+- **Phase 3 (UX & CRUD)**: Globales Toast-Notification-System, dynamische Modals zur Projektanlage und -bearbeitung.
+
+### Phase 4 – Analytics & Reporting
 - Dashboard-Charts (Recharts/D3)
 - PDF-Export für Grundbuchberichte
-- E-Mail-Benachrichtigungen bei Status-Änderungen
-- Audit-Log für alle Änderungen
 
-### Phase 4 – Production
+### Phase 5 – Automatisierung & Audit
+- E-Mail-Benachrichtigungen bei Status-Änderungen
+- Audit-Log für alle Änderungen (History-Tracking)
+
+### Phase 6 – Production & DevOps
 - CI/CD Pipeline (GitHub Actions)
 - Kubernetes-Deployment
 - Monitoring (Prometheus/Grafana)
