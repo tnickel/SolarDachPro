@@ -1,18 +1,35 @@
-import type { ApiResponse, CommercialClient, SolarProject, LandRegistry } from "../types";
+import type { ApiResponse, CommercialClient, SolarProject, LandRegistry, User } from "../types";
 
 const API_BASE = "/api/v1";
 
 /**
- * Generic fetch wrapper with error handling.
+ * Generic fetch wrapper with error handling and JWT injection.
  */
 async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem("token");
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE}${endpoint}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers: {
+      ...headers,
+      ...options?.headers,
+    },
   });
 
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    window.dispatchEvent(new CustomEvent("auth-failed"));
+  }
+
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: { message: "Network error" } }));
+    const error = await res.json().catch(() => ({ error: { message: "Netzwerkfehler" } }));
     throw new Error(error.error?.message || `HTTP ${res.status}`);
   }
 
@@ -20,6 +37,19 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
   if (res.status === 204) return {} as T;
 
   return res.json();
+}
+
+// ---- Auth ----
+
+export async function login(credentials: { email: string; password: string }) {
+  return fetchApi<ApiResponse<{ token: string; user: User }>>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(credentials),
+  });
+}
+
+export async function getMe() {
+  return fetchApi<ApiResponse<User>>("/auth/me");
 }
 
 // ---- Clients ----
@@ -34,6 +64,13 @@ export async function getClient(id: string) {
 }
 
 // ---- Projects ----
+
+export async function createProject(data: Partial<SolarProject>) {
+  return fetchApi<ApiResponse<SolarProject>>(`/projects`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
 
 export async function getProjects(filters?: { status?: string; clientId?: string }) {
   const params = new URLSearchParams();
@@ -78,3 +115,4 @@ export async function updateLandRegistryStatus(
     body: JSON.stringify({ legalStatus, legalNotes }),
   });
 }
+

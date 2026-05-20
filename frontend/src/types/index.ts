@@ -107,3 +107,15 @@ export const ROOF_TYPE_LABELS: Record<RoofType, string> = {
   METAL_SHEET: "Blechdach",
   OTHER: "Sonstige",
 };
+
+export type UserRole = "ADMIN" | "VIEWER";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  createdAt: string;
+  updatedAt: string;
+}
+

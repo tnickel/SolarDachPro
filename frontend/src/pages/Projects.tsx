@@ -2,10 +2,14 @@ import { useEffect, useState } from "react";
 import {
   type SolarProject,
   type ProjectStatus,
+  type CommercialClient,
+  type RoofType,
   PROJECT_STATUS_LABELS,
   ROOF_TYPE_LABELS,
 } from "../types";
-import { getProjects, updateProjectStatus } from "../api/client";
+import { getProjects, updateProjectStatus, getClients, createProject } from "../api/client";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 const ALL_STATUSES: ProjectStatus[] = [
   "PLANNING",
@@ -17,21 +21,53 @@ const ALL_STATUSES: ProjectStatus[] = [
 ];
 
 export default function Projects() {
+  const { isAdmin } = useAuth();
+  const { addToast } = useToast();
+  
   const [projects, setProjects] = useState<SolarProject[]>([]);
+  const [clients, setClients] = useState<CommercialClient[]>([]);
   const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<ProjectStatus>("PLANNING");
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newProject, setNewProject] = useState<Partial<SolarProject>>({
+    projectName: "",
+    status: "PLANNING",
+    plannedKwp: 0,
+    roofType: "FLAT",
+    clientId: "",
+  });
 
   useEffect(() => {
     loadProjects();
-  }, [filterStatus]);
+    if (isAdmin) {
+      loadClients();
+    }
+  }, [filterStatus, isAdmin]);
+
+  async function loadClients() {
+    try {
+      const res = await getClients();
+      setClients(res.data);
+      if (res.data.length > 0 && !newProject.clientId) {
+        setNewProject((prev) => ({ ...prev, clientId: res.data[0].id }));
+      }
+    } catch (err) {
+      addToast("Gewerbekunden konnten nicht geladen werden.", "error");
+    }
+  }
 
   async function loadProjects() {
     setLoading(true);
     try {
       const res = await getProjects(filterStatus ? { status: filterStatus } : undefined);
       setProjects(res.data);
+    } catch (err) {
+      addToast("Projekte konnten nicht geladen werden.", "error");
     } finally {
       setLoading(false);
     }
@@ -42,8 +78,39 @@ export default function Projects() {
       await updateProjectStatus(id, newStatus);
       setEditingId(null);
       loadProjects();
+      addToast("Status erfolgreich geändert", "success");
     } catch (err) {
-      alert("Fehler: " + (err as Error).message);
+      addToast("Fehler beim Ändern des Status: " + (err as Error).message, "error");
+    }
+  }
+
+  async function handleCreateProject(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newProject.projectName || !newProject.clientId || !newProject.plannedKwp) {
+      addToast("Bitte alle Pflichtfelder ausfüllen.", "error");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      await createProject({
+        ...newProject,
+        plannedKwp: Number(newProject.plannedKwp),
+      });
+      addToast("Projekt erfolgreich angelegt!", "success");
+      setIsModalOpen(false);
+      setNewProject({ 
+        projectName: "", 
+        status: "PLANNING", 
+        plannedKwp: 0, 
+        roofType: "FLAT", 
+        clientId: clients[0]?.id || "" 
+      });
+      loadProjects();
+    } catch (err) {
+      addToast("Fehler beim Anlegen: " + (err as Error).message, "error");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -57,7 +124,7 @@ export default function Projects() {
         <div className="table-container">
           <div className="table-header">
             <h3>☀️ {projects.length} Projekte</h3>
-            <div className="table-search">
+            <div className="table-search" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -79,6 +146,11 @@ export default function Projects() {
                   </option>
                 ))}
               </select>
+              {isAdmin && (
+                <button className="btn btn-primary btn-sm" onClick={() => setIsModalOpen(true)}>
+                  + Neues Projekt
+                </button>
+              )}
             </div>
           </div>
 
@@ -117,7 +189,9 @@ export default function Projects() {
                     <td>{ROOF_TYPE_LABELS[project.roofType]}</td>
                     <td>{project.roofAreaSqm?.toLocaleString("de-DE") || "–"}</td>
                     <td>
-                      {editingId === project.id ? (
+                      {!isAdmin ? (
+                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Nur Ansicht</span>
+                      ) : editingId === project.id ? (
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <select
                             value={newStatus}
@@ -177,6 +251,113 @@ export default function Projects() {
           )}
         </div>
       </div>
+
+      {/* CREATE PROJECT MODAL */}
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: "500px" }}>
+            <h3>Neues Projekt anlegen</h3>
+            <form onSubmit={handleCreateProject} style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
+              
+              <div className="modal-field">
+                <label>Projektname *</label>
+                <input 
+                  type="text" 
+                  value={newProject.projectName} 
+                  onChange={(e) => setNewProject({ ...newProject, projectName: e.target.value })} 
+                  required 
+                  placeholder="z.B. Logistikhalle B"
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "10px 14px",
+                    color: "var(--text-primary)",
+                    width: "100%",
+                    boxSizing: "border-box"
+                  }}
+                />
+              </div>
+
+              <div className="modal-field">
+                <label>Gewerbekunde *</label>
+                <select 
+                  value={newProject.clientId} 
+                  onChange={(e) => setNewProject({ ...newProject, clientId: e.target.value })}
+                  required
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "10px 14px",
+                    color: "var(--text-primary)",
+                    width: "100%",
+                    boxSizing: "border-box"
+                  }}
+                >
+                  <option value="" disabled>Bitte wählen...</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.companyName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "flex", gap: "16px" }}>
+                <div className="modal-field" style={{ flex: 1 }}>
+                  <label>Geplante Leistung (kWp) *</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    step="0.1"
+                    value={newProject.plannedKwp || ""} 
+                    onChange={(e) => setNewProject({ ...newProject, plannedKwp: Number(e.target.value) })} 
+                    required 
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "10px 14px",
+                      color: "var(--text-primary)",
+                      width: "100%",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+                <div className="modal-field" style={{ flex: 1 }}>
+                  <label>Dachtyp</label>
+                  <select 
+                    value={newProject.roofType} 
+                    onChange={(e) => setNewProject({ ...newProject, roofType: e.target.value as RoofType })}
+                    style={{
+                      background: "var(--bg-input)",
+                      border: "1px solid var(--border-color)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "10px 14px",
+                      color: "var(--text-primary)",
+                      width: "100%",
+                      boxSizing: "border-box"
+                    }}
+                  >
+                    {Object.entries(ROOF_TYPE_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: "10px" }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setIsModalOpen(false)}>
+                  Abbrechen
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                  {isSubmitting ? "Speichere..." : "Projekt anlegen"}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

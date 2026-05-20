@@ -1,4 +1,5 @@
-import { PrismaClient, ProjectStatus, LegalReviewStatus, RoofType } from "@prisma/client";
+import { PrismaClient, ProjectStatus, LegalReviewStatus, RoofType, UserRole } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -12,9 +13,33 @@ async function main() {
   console.log("🌱 Seeding database...\n");
 
   // Clean existing data (in correct order due to foreign keys)
+  await prisma.user.deleteMany();
   await prisma.landRegistry.deleteMany();
   await prisma.solarProject.deleteMany();
   await prisma.commercialClient.deleteMany();
+
+  // Create Users
+  const adminPasswordHash = await bcrypt.hash("admin12345", 10);
+  const viewerPasswordHash = await bcrypt.hash("viewer12345", 10);
+
+  await prisma.user.createMany({
+    data: [
+      {
+        name: "Max Admin",
+        email: "admin@solardachpro.de",
+        passwordHash: adminPasswordHash,
+        role: UserRole.ADMIN,
+      },
+      {
+        name: "Anna Viewer",
+        email: "viewer@solardachpro.de",
+        passwordHash: viewerPasswordHash,
+        role: UserRole.VIEWER,
+      },
+    ],
+  });
+  console.log("✅ 2 Demo-Benutzer angelegt");
+
 
   // ──────────────────────────────────────────────
   // Client 1: Müller Logistik GmbH (Hamburg)

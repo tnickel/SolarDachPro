@@ -5,6 +5,8 @@ import {
   LEGAL_STATUS_LABELS,
 } from "../types";
 import { getLandRegistries, updateLandRegistryStatus } from "../api/client";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 const ALL_LEGAL_STATUSES: LegalReviewStatus[] = [
   "PENDING",
@@ -15,6 +17,8 @@ const ALL_LEGAL_STATUSES: LegalReviewStatus[] = [
 ];
 
 export default function LandRegistryPage() {
+  const { isAdmin } = useAuth();
+  const { addToast } = useToast();
   const [entries, setEntries] = useState<LandRegistry[]>([]);
   const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
@@ -23,6 +27,7 @@ export default function LandRegistryPage() {
   const [editEntry, setEditEntry] = useState<LandRegistry | null>(null);
   const [modalStatus, setModalStatus] = useState<LegalReviewStatus>("PENDING");
   const [modalNotes, setModalNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadEntries();
@@ -48,12 +53,16 @@ export default function LandRegistryPage() {
 
   async function handleStatusUpdate() {
     if (!editEntry) return;
+    setIsSubmitting(true);
     try {
       await updateLandRegistryStatus(editEntry.id, modalStatus, modalNotes || undefined);
       setEditEntry(null);
       loadEntries();
+      addToast("Grundbuchstatus erfolgreich aktualisiert", "success");
     } catch (err) {
-      alert("Fehler: " + (err as Error).message);
+      addToast("Fehler beim Aktualisieren: " + (err as Error).message, "error");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -131,12 +140,16 @@ export default function LandRegistryPage() {
                         : "–"}
                     </td>
                     <td>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => openStatusModal(entry)}
-                      >
-                        Bearbeiten
-                      </button>
+                      {!isAdmin ? (
+                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Nur Ansicht</span>
+                      ) : (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => openStatusModal(entry)}
+                        >
+                          Bearbeiten
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -219,8 +232,12 @@ export default function LandRegistryPage() {
               >
                 Abbrechen
               </button>
-              <button className="btn btn-primary" onClick={handleStatusUpdate}>
-                Status aktualisieren
+              <button 
+                className="btn btn-primary" 
+                onClick={handleStatusUpdate}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Aktualisiere..." : "Status aktualisieren"}
               </button>
             </div>
           </div>

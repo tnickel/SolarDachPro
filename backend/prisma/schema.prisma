@@ -116,3 +116,23 @@ model LandRegistry {
   @@index([legalStatus])
   @@map("land_registry")
 }
+
+enum UserRole {
+  ADMIN
+  VIEWER
+}
+
+/// Benutzer – Systembenutzer fuer Login
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole @default(VIEWER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+

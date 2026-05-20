@@ -21,9 +21,9 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
-  // JWT (Phase 2 – optional for now)
-  JWT_SECRET: z.string().min(8).optional(),
-  JWT_EXPIRES_IN: z.string().default("7d"),
+  // JWT (Phase 2)
+  JWT_SECRET: z.string().min(8).default("super-secret-solar-key-12345-portfolio"),
+  JWT_EXPIRES_IN: z.string().default("24h"),
 });
 
 /**

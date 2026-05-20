@@ -1,37 +1,83 @@
 import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import { env } from "../config/env";
+import { UserRole } from "@prisma/client";
 
-/**
- * Authentication middleware stub (Phase 2).
- *
- * Currently passes all requests through without verification.
- * Will be replaced with JWT token validation in Phase 2.
- *
- * Usage:
- *   router.use(authenticate);  // Protect all routes in this router
- *   router.get("/", authenticate, controller.list);  // Protect single route
- */
-export function authenticate(
-  _req: Request,
-  _res: Response,
-  next: NextFunction
-): void {
-  // TODO Phase 2: Implement JWT verification
-  // 1. Extract token from Authorization header (Bearer <token>)
-  // 2. Verify token using env.JWT_SECRET
-  // 3. Attach decoded user to req.user
-  // 4. Call next() on success, or return 401 on failure
-  next();
+interface DecodedToken {
+  id: string;
+  email: string;
+  role: UserRole;
+  name: string;
 }
 
 /**
- * Role-based authorization middleware stub (Phase 2).
- *
- * @param _roles - Allowed roles (e.g., "admin", "viewer")
+ * Authentication middleware.
+ * Verifies JWT token and attaches user payload to req.user.
  */
-export function authorize(..._roles: string[]) {
-  return (_req: Request, _res: Response, next: NextFunction): void => {
-    // TODO Phase 2: Check if req.user.role is in allowed roles
-    // Return 403 Forbidden if not authorized
+export function authenticate(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({
+      success: false,
+      error: {
+        message: "Authentifizierung erforderlich. Token fehlt oder ist ungueltig.",
+      },
+    });
+    return;
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, env.JWT_SECRET) as DecodedToken;
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      name: decoded.name,
+    };
+    next();
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      error: {
+        message: "Ungueltiges oder abgelaufenes Token.",
+      },
+    });
+  }
+}
+
+/**
+ * Role-based authorization middleware.
+ * Grants access only if user's role is in the allowed roles.
+ */
+export function authorize(...roles: UserRole[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: {
+          message: "Nicht authentifiziert.",
+        },
+      });
+      return;
+    }
+
+    if (!roles.includes(req.user.role)) {
+      res.status(403).json({
+        success: false,
+        error: {
+          message: "Keine Berechtigung fuer diese Aktion.",
+        },
+      });
+      return;
+    }
+
     next();
   };
 }

@@ -276,11 +276,8 @@ Stage 2 (production):
 | Container | Non-root User | `appuser:1001` im Docker Container |
 | Konfiguration | Fail-fast | Zod-Validierung aller Env-Variablen beim Start |
 | Fehler | Strukturiert | Keine Stack-Traces in Production |
-
-### 7.2 Vorbereitet (Phase 2)
-
-- JWT-basierte Authentifizierung (Middleware-Stub vorhanden)
-- Rollenbasierte Autorisierung (Authorize-Stub vorhanden)
+| Authentifizierung | JWT & bcrypt | Signierte Tokens, Password-Hashing |
+| Autorisierung | Rollen (RBAC) | Schreibrechte nur für `ADMIN`, Read-Only für `VIEWER` |
 
 ---
 
@@ -297,11 +294,6 @@ Die Demo-Daten bilden ein realistisches Szenario ab:
 ---
 
 ## 9. Weiterentwicklung (Roadmap)
-
-### Phase 2 – Authentifizierung
-- JWT Login/Register Endpoints
-- Protected Routes im Frontend
-- Rollenbasierter Zugang (Admin, Viewer)
 
 ### Phase 3 – Erweiterte Features
 - Dashboard-Charts (Recharts/D3)
