@@ -72,6 +72,13 @@ export async function createProject(data: Partial<SolarProject>) {
   });
 }
 
+export async function updateProject(id: string, data: Partial<SolarProject>) {
+  return fetchApi<ApiResponse<SolarProject>>(`/projects/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function getProjects(filters?: { status?: string; clientId?: string }) {
   const params = new URLSearchParams();
   if (filters?.status) params.set("status", filters.status);

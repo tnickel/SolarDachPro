@@ -7,7 +7,7 @@ import {
   PROJECT_STATUS_LABELS,
   ROOF_TYPE_LABELS,
 } from "../types";
-import { getProjects, updateProjectStatus, getClients, createProject } from "../api/client";
+import { getProjects, updateProjectStatus, getClients, createProject, updateProject } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
@@ -28,13 +28,14 @@ export default function Projects() {
   const [clients, setClients] = useState<CommercialClient[]>([]);
   const [filterStatus, setFilterStatus] = useState("");
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<ProjectStatus>("PLANNING");
   
-  // Modal State
+  // Modal State for Create/Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newProject, setNewProject] = useState<Partial<SolarProject>>({
+  const [editProjectId, setEditProjectId] = useState<string | null>(null);
+  const [modalProject, setModalProject] = useState<Partial<SolarProject>>({
     projectName: "",
     status: "PLANNING",
     plannedKwp: 0,
@@ -53,8 +54,8 @@ export default function Projects() {
     try {
       const res = await getClients();
       setClients(res.data);
-      if (res.data.length > 0 && !newProject.clientId) {
-        setNewProject((prev) => ({ ...prev, clientId: res.data[0].id }));
+      if (res.data.length > 0 && !modalProject.clientId && !editProjectId) {
+        setModalProject((prev) => ({ ...prev, clientId: res.data[0].id }));
       }
     } catch (err) {
       addToast("Gewerbekunden konnten nicht geladen werden.", "error");
@@ -76,7 +77,7 @@ export default function Projects() {
   async function handleStatusUpdate(id: string) {
     try {
       await updateProjectStatus(id, newStatus);
-      setEditingId(null);
+      setInlineEditingId(null);
       loadProjects();
       addToast("Status erfolgreich geändert", "success");
     } catch (err) {
@@ -84,31 +85,58 @@ export default function Projects() {
     }
   }
 
-  async function handleCreateProject(e: React.FormEvent) {
+  function openCreateModal() {
+    setEditProjectId(null);
+    setModalProject({
+      projectName: "",
+      status: "PLANNING",
+      plannedKwp: 0,
+      roofType: "FLAT",
+      clientId: clients[0]?.id || "",
+    });
+    setIsModalOpen(true);
+  }
+
+  function openEditModal(project: SolarProject) {
+    setEditProjectId(project.id);
+    setModalProject({
+      projectName: project.projectName,
+      status: project.status,
+      plannedKwp: project.plannedKwp,
+      roofType: project.roofType,
+      clientId: project.clientId,
+    });
+    setIsModalOpen(true);
+  }
+
+  async function handleSaveProject(e: React.FormEvent) {
     e.preventDefault();
-    if (!newProject.projectName || !newProject.clientId || !newProject.plannedKwp) {
+    if (!modalProject.projectName || !modalProject.clientId || !modalProject.plannedKwp) {
       addToast("Bitte alle Pflichtfelder ausfüllen.", "error");
       return;
     }
     
     setIsSubmitting(true);
     try {
-      await createProject({
-        ...newProject,
-        plannedKwp: Number(newProject.plannedKwp),
-      });
-      addToast("Projekt erfolgreich angelegt!", "success");
+      if (editProjectId) {
+        // Update existing project
+        await updateProject(editProjectId, {
+          ...modalProject,
+          plannedKwp: Number(modalProject.plannedKwp),
+        });
+        addToast("Projekt erfolgreich aktualisiert!", "success");
+      } else {
+        // Create new project
+        await createProject({
+          ...modalProject,
+          plannedKwp: Number(modalProject.plannedKwp),
+        });
+        addToast("Projekt erfolgreich angelegt!", "success");
+      }
       setIsModalOpen(false);
-      setNewProject({ 
-        projectName: "", 
-        status: "PLANNING", 
-        plannedKwp: 0, 
-        roofType: "FLAT", 
-        clientId: clients[0]?.id || "" 
-      });
       loadProjects();
     } catch (err) {
-      addToast("Fehler beim Anlegen: " + (err as Error).message, "error");
+      addToast("Fehler beim Speichern: " + (err as Error).message, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -147,7 +175,7 @@ export default function Projects() {
                 ))}
               </select>
               {isAdmin && (
-                <button className="btn btn-primary btn-sm" onClick={() => setIsModalOpen(true)}>
+                <button className="btn btn-primary btn-sm" onClick={openCreateModal}>
                   + Neues Projekt
                 </button>
               )}
@@ -169,7 +197,7 @@ export default function Projects() {
                   <th>kWp</th>
                   <th>Dachtyp</th>
                   <th>Fläche m²</th>
-                  <th>Aktion</th>
+                  <th>Aktionen</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,7 +219,7 @@ export default function Projects() {
                     <td>
                       {!isAdmin ? (
                         <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Nur Ansicht</span>
-                      ) : editingId === project.id ? (
+                      ) : inlineEditingId === project.id ? (
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <select
                             value={newStatus}
@@ -220,21 +248,31 @@ export default function Projects() {
                           </button>
                           <button
                             className="btn btn-ghost btn-sm"
-                            onClick={() => setEditingId(null)}
+                            onClick={() => setInlineEditingId(null)}
                           >
                             ✕
                           </button>
                         </div>
                       ) : (
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => {
-                            setEditingId(project.id);
-                            setNewStatus(project.status);
-                          }}
-                        >
-                          Status ändern
-                        </button>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            title="Status schnell ändern"
+                            onClick={() => {
+                              setInlineEditingId(project.id);
+                              setNewStatus(project.status);
+                            }}
+                          >
+                            Status
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            title="Projekt bearbeiten"
+                            onClick={() => openEditModal(project)}
+                          >
+                            Bearbeiten
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -252,19 +290,19 @@ export default function Projects() {
         </div>
       </div>
 
-      {/* CREATE PROJECT MODAL */}
+      {/* CREATE / EDIT PROJECT MODAL */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: "500px" }}>
-            <h3>Neues Projekt anlegen</h3>
-            <form onSubmit={handleCreateProject} style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
+            <h3>{editProjectId ? "Projekt bearbeiten" : "Neues Projekt anlegen"}</h3>
+            <form onSubmit={handleSaveProject} style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "20px" }}>
               
               <div className="modal-field">
                 <label>Projektname *</label>
                 <input 
                   type="text" 
-                  value={newProject.projectName} 
-                  onChange={(e) => setNewProject({ ...newProject, projectName: e.target.value })} 
+                  value={modalProject.projectName} 
+                  onChange={(e) => setModalProject({ ...modalProject, projectName: e.target.value })} 
                   required 
                   placeholder="z.B. Logistikhalle B"
                   style={{
@@ -282,8 +320,8 @@ export default function Projects() {
               <div className="modal-field">
                 <label>Gewerbekunde *</label>
                 <select 
-                  value={newProject.clientId} 
-                  onChange={(e) => setNewProject({ ...newProject, clientId: e.target.value })}
+                  value={modalProject.clientId} 
+                  onChange={(e) => setModalProject({ ...modalProject, clientId: e.target.value })}
                   required
                   style={{
                     background: "var(--bg-input)",
@@ -309,8 +347,8 @@ export default function Projects() {
                     type="number" 
                     min="1"
                     step="0.1"
-                    value={newProject.plannedKwp || ""} 
-                    onChange={(e) => setNewProject({ ...newProject, plannedKwp: Number(e.target.value) })} 
+                    value={modalProject.plannedKwp || ""} 
+                    onChange={(e) => setModalProject({ ...modalProject, plannedKwp: Number(e.target.value) })} 
                     required 
                     style={{
                       background: "var(--bg-input)",
@@ -326,8 +364,8 @@ export default function Projects() {
                 <div className="modal-field" style={{ flex: 1 }}>
                   <label>Dachtyp</label>
                   <select 
-                    value={newProject.roofType} 
-                    onChange={(e) => setNewProject({ ...newProject, roofType: e.target.value as RoofType })}
+                    value={modalProject.roofType} 
+                    onChange={(e) => setModalProject({ ...modalProject, roofType: e.target.value as RoofType })}
                     style={{
                       background: "var(--bg-input)",
                       border: "1px solid var(--border-color)",
@@ -350,7 +388,7 @@ export default function Projects() {
                   Abbrechen
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? "Speichere..." : "Projekt anlegen"}
+                  {isSubmitting ? "Speichere..." : "Projekt speichern"}
                 </button>
               </div>
 

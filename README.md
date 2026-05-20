@@ -1,5 +1,7 @@
 # SolarDach Pro – Solar-as-a-Service Dashboard
 
+![SolarDach Pro Hero](./doc/hero.png)
+
 Ein internes SaaS-Dashboard zur Verwaltung gewerblicher Dachpachtverträge und Solarprojekte.
 
 > **Portfolio-Demo** für ein Climate-Tech Startup im Bereich "Solar-as-a-Service"
@@ -34,12 +36,15 @@ Ein internes SaaS-Dashboard zur Verwaltung gewerblicher Dachpachtverträge und S
 - **3 Domänen-Entitäten**: Gewerbekunden, Solarprojekte, Grundbucheinträge
 - **Prisma ORM** mit PostgreSQL – type-safe Queries und automatische Migrationen
 - **Zod-Validierung** auf allen Endpoints
+- **Authentifizierung & Autorisierung**: JWT-basierter Login, Role-Based Access Control (Admin/Viewer)
 - **Security**: Helmet, CORS, Non-root Docker User
 - **Strukturierte Fehlerbehandlung** mit AppError-Hierarchie
 - **Seed-Daten**: 5 realistische Gewerbekunden mit 12 Projekten
 
 ### Frontend
 - **React 19** Dashboard mit Dark Mode Design
+- **Globales Toast-Notification-System** für elegantes User-Feedback
+- **Projektanlage-Formular**: Komfortable Neuanlage von Solarprojekten über Modal-Overlays
 - **Kartenansicht** (Leaflet/OpenStreetMap) mit farbcodierten Projekt-Markern
 - **KPI-Dashboard** mit Live-Statistiken
 - **Interaktive Tabellen** mit Suche und Filterung
@@ -302,10 +307,11 @@ CommercialClient 1──N SolarProject 1──N LandRegistry
 | Security Headers | Helmet (XSS, HSTS, etc.) |
 | CORS | Konfigurierbar via `CORS_ORIGIN` |
 | Input-Validierung | Zod-Schemas auf allen Endpoints |
+| Authentifizierung | Echtes JWT-Login-System inkl. Password Hashing (bcrypt) |
+| Autorisierung | Rollen-Konzept (RBAC): Bearbeiten nur für `ADMIN`, Read-Only für `VIEWER` |
 | Docker Security | Non-root User im Container |
 | Fail-fast Config | Zod-validierte Umgebungsvariablen |
 | Error Handling | Keine Stack-Traces in Production |
-| Auth-Vorbereitung | JWT Middleware-Stub (Phase 2) |
 
 ---
 
